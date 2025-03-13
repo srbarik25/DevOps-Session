@@ -84,7 +84,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Create ECR repository if missing
-        uses: byu-oit/github-actions-create-ecr-repo-if-missing@v1.0.0
+        uses: byu-oit/github-actions-create-ecr-repo-if-missing@v2
         with:
           repository-name: ${{ env.ECR_REPOSITORY }}
           aws-region: ${{ env.AWS_REGION }}
