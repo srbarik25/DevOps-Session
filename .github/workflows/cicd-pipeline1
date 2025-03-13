@@ -1,0 +1,111 @@
+name: CICD PIPELINE-1
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: my-ecr-repo
+  DOCKER_IMAGE_NAME: my-app
+
+jobs:
+  setup-environment:
+    name: Setup Environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set environment based on branch
+        id: set-env
+        run: |
+          if [[ $GITHUB_REF == refs/heads/main ]]; then
+            echo "environment=dev" >> $GITHUB_OUTPUT
+          elif [[ $GITHUB_REF == refs/heads/test ]]; then
+            echo "environment=test" >> $GITHUB_OUTPUT
+          else
+            echo "environment=prod" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Print environment
+        run: |
+         echo "Environment: ${{ steps.set-env.outputs.environment }}"
+
+  sonarqube-scan:
+    name: SonarQube Code Scan
+    runs-on: ubuntu-latest
+    needs: setup-environment
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK (if needed)
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+
+      - name: Run SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  check-or-create-ecr:
+    name: Check or Create ECR Repository
+    runs-on: ubuntu-latest
+    needs: setup-environment
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create ECR repository if missing
+        uses: byu-oit/github-actions-create-ecr-repo-if-missing@v1.0.0
+        with:
+          repository-name: ${{ env.ECR_REPOSITORY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+  build-and-push-docker:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [setup-environment, check-or-create-ecr]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ env.DOCKER_IMAGE_NAME }} .
+
+      - name: Tag Docker image
+        run: |
+          docker tag ${{ env.DOCKER_IMAGE_NAME }}:latest \
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.setup-environment.outputs.environment }}-$(date +%Y%m%d%H%M%S)
+
+      - name: Push Docker image to ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.setup-environment.outputs.environment }}-$(date +%Y%m%d%H%M%S)
