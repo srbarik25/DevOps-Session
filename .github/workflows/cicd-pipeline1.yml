@@ -111,7 +111,7 @@ jobs:
       - name: Build Docker image
         run: |
           pwd
-          la -latr
+          ls -latr
           docker build -t ${{ env.DOCKER_IMAGE_NAME }} .
 
       - name: Tag Docker image
