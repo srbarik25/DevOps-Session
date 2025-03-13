@@ -112,6 +112,7 @@ jobs:
         run: |
           pwd
           ls -latr
+          cd frontend-app
           docker build -t ${{ env.DOCKER_IMAGE_NAME }} .
 
       - name: Tag Docker image
