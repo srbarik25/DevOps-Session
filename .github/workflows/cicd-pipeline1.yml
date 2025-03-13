@@ -12,6 +12,9 @@ env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: my-ecr-repo
   DOCKER_IMAGE_NAME: my-app
+permissions:
+  id-token: write
+  contents: write
 
 jobs:
   setup-environment:
