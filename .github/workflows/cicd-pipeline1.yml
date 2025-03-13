@@ -82,13 +82,22 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
+      
 
-      - name: Create ECR repository if missing
-        uses: byu-oit/github-actions-create-ecr-repo-if-missing@v2
-        with:
-          token: ${{ secrets.MY_TOKEN }}
-          repository-name: ${{ env.ECR_REPOSITORY }}
-          aws-region: ${{ env.AWS_REGION }}
+      - name: Check or Create ECR Repository
+        run: |
+          if aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+            echo "ECR repository already exists."
+          else
+            echo "ECR repository does not exist. Creating..."
+            aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }}
+          fi
+      # - name: Create ECR repository if missing
+      #   uses: byu-oit/github-actions-create-ecr-repo-if-missing@v2
+      #   with:
+      #     token: ${{ secrets.MY_TOKEN }}
+      #     repository-name: ${{ env.ECR_REPOSITORY }}
+      #     aws-region: ${{ env.AWS_REGION }}
 
   build-and-push-docker:
     name: Build and Push Docker Image
